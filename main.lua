@@ -5,6 +5,8 @@
 ----  This source code is licensed under the Apache 2 license found in the
 ----  LICENSE file in the root directory of this source tree. 
 ----
+
+-- Nghia: This part is just for checking cuda
 local ok,cunn = pcall(require, 'fbcunn')
 if not ok then
     ok,cunn = pcall(require,'cunn')
@@ -20,8 +22,11 @@ else
     cudaComputeCapability = deviceParams.major + deviceParams.minor/10
     LookupTable = nn.LookupTable
 end
+
+
 require('nngraph')
 require('base')
+
 local ptb = require('data')
 
 -- Train 1 day and gives 82 perplexity.
@@ -54,6 +59,7 @@ local params = {batch_size=20,
                 max_max_epoch=13,
                 max_grad_norm=5}
 
+-- turn something into cuda version
 local function transfer_data(x)
   return x:cuda()
 end
@@ -64,6 +70,9 @@ local paramx, paramdx
 
 local function lstm(x, prev_c, prev_h)
   -- Calculate all four gates in one go
+  
+  -- Nghia: This is i2c or h2c in my note
+  -- x is the input data, h is the hidden
   local i2h = nn.Linear(params.rnn_size, 4*params.rnn_size)(x)
   local h2h = nn.Linear(params.rnn_size, 4*params.rnn_size)(prev_h)
   local gates = nn.CAddTable()({i2h, h2h})
@@ -71,11 +80,22 @@ local function lstm(x, prev_c, prev_h)
   -- Reshape to (batch_size, n_gates, hid_size)
   -- Then slize the n_gates dimension, i.e dimension 2
   local reshaped_gates =  nn.Reshape(4,params.rnn_size)(gates)
+  -- Nghia: this reshape seems fishy (needs to know the major, should be 
+  -- row-major?)
+  -- Nghia: in the end, it doesn't matter since it's fully connected
+  -- => you can choose the output
+  
+  -- Nghia: cut the table for rows
+  -- 2 = rows, 1 = columns?
   local sliced_gates = nn.SplitTable(2)(reshaped_gates)
+  -- TODO: view this dimension crap
   
   -- Use select gate to fetch each gate and apply nonlinearity
   local in_gate          = nn.Sigmoid()(nn.SelectTable(1)(sliced_gates))
+  
+  -- Nghia: this is the row for real input, (why tanh?)
   local in_transform     = nn.Tanh()(nn.SelectTable(2)(sliced_gates))
+  
   local forget_gate      = nn.Sigmoid()(nn.SelectTable(3)(sliced_gates))
   local out_gate         = nn.Sigmoid()(nn.SelectTable(4)(sliced_gates))
 
@@ -87,20 +107,38 @@ local function lstm(x, prev_c, prev_h)
 
   return next_c, next_h
 end
+-- Nghia: This is easy, how do we get the gradients
+
 
 local function create_network()
+
   local x                = nn.Identity()()
   local y                = nn.Identity()()
   local prev_s           = nn.Identity()()
+  
+  -- Nghia: look up the embedding, don't really understand the syntax though
+  -- guessing: dictionary, where 0 position is the first word?
   local i                = {[0] = LookupTable(params.vocab_size,
                                                     params.rnn_size)(x)}
   local next_s           = {}
+  
+  -- Nghia: prev_s = previous state?
+  -- which contains c and h?
   local split         = {prev_s:split(2 * params.layers)}
+  -- Nghia: instead of scan like Theano, they do the real loop here
   for layer_idx = 1, params.layers do
+    -- Nghia: TODO: this indexing is crazy
     local prev_c         = split[2 * layer_idx - 1]
     local prev_h         = split[2 * layer_idx]
+    -- TODO: write about dropout
+    -- here instead of dropping the weight, they drop something from the input
     local dropped        = nn.Dropout(params.dropout)(i[layer_idx - 1])
+    -- Nghia: is it shared or not shared
+    -- the linear layer's weight?!?
     local next_c, next_h = lstm(dropped, prev_c, prev_h)
+    
+    -- Nghia: what table?
+    -- lua model to insert next_c into next_s
     table.insert(next_s, next_c)
     table.insert(next_s, next_h)
     i[layer_idx] = next_h
@@ -109,8 +147,12 @@ local function create_network()
   local dropped          = nn.Dropout(params.dropout)(i[params.layers])
   local pred             = nn.LogSoftMax()(h2y(dropped))
   local err              = nn.ClassNLLCriterion()({pred, y})
+  
+  -- Nghia: gModule: computation graph from nngraph
   local module           = nn.gModule({x, y, prev_s},
                                       {err, nn.Identity()(next_s)})
+                                      
+  -- TODO: check this uniform thing
   module:getParameters():uniform(-params.init_weight, params.init_weight)
   return transfer_data(module)
 end
@@ -119,6 +161,8 @@ local function setup()
   print("Creating a RNN LSTM network.")
   local core_network = create_network()
   paramx, paramdx = core_network:getParameters()
+  -- Nghia: Lua is similar to python in that the freaking 
+  -- attributes can be added dynamically
   model.s = {}
   model.ds = {}
   model.start_s = {}
@@ -153,6 +197,7 @@ local function reset_ds()
   end
 end
 
+-- Nghia: real thing is done here
 local function fp(state)
   g_replace_table(model.s[0], model.start_s)
   if state.pos + params.seq_length > state.data:size(1) then
