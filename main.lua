@@ -51,7 +51,7 @@ local params = {batch_size=20,
                 -- only 1 layer
                 -- turn it back to 2 later
                 -- layers=2,
-                layers=1,
+                layers=2,
                 decay=2,
                 rnn_size=200,
                 dropout=0,
