@@ -154,7 +154,8 @@ local function create_network()
   -- Nghia: gModule: computation graph from nngraph
   local module           = nn.gModule({x, y, prev_s},
                                       {err, nn.Identity()(next_s)})
-  graph.dot(module.fg, "LSTM","/home/thenghiapham/lstm.svg")                                    
+  graph.dot(module.fg, "LSTM","/home/thenghiapham/lstm_fw")
+  graph.dot(module.bg, "LSTM","/home/thenghiapham/lstm_bw")                             
   -- TODO: check this uniform thing
   module:getParameters():uniform(-params.init_weight, params.init_weight)
   return transfer_data(module)
