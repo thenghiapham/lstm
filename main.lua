@@ -48,7 +48,10 @@ local params = {batch_size=20,
 -- Trains 1h and gives test 115 perplexity.
 local params = {batch_size=20,
                 seq_length=20,
-                layers=2,
+                -- only 1 layer
+                -- turn it back to 2 later
+                -- layers=2,
+                layers=1,
                 decay=2,
                 rnn_size=200,
                 dropout=0,
