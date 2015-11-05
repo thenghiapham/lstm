@@ -119,8 +119,10 @@ local function create_network()
   local y                = nn.Identity()()
   local prev_s           = nn.Identity()()
   
-  -- Nghia: look up the embedding, don't really understand the syntax though
-  -- guessing: dictionary, where 0 position is the first word?
+  -- Nghia: create the word embedding layer
+  --   
+  -- i contains the inputs to the higher c (then c goes to h)
+  -- i.e. either word embedding of x, or the lower layer h
   local i                = {[0] = LookupTable(params.vocab_size,
                                                     params.rnn_size)(x)}
   local next_s           = {}
