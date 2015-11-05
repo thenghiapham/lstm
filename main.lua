@@ -130,7 +130,7 @@ local function create_network()
   local split         = {prev_s:split(2 * params.layers)}
   -- Nghia: instead of scan like Theano, they do the real loop here
   for layer_idx = 1, params.layers do
-    -- Nghia: TODO: this indexing is crazy
+    -- Nghia: there are a bunch of layers, c, h, c, h
     local prev_c         = split[2 * layer_idx - 1]
     local prev_h         = split[2 * layer_idx]
     -- TODO: write about dropout
