@@ -114,6 +114,10 @@ end
 
 
 local function create_network()
+  -- here he's use a table for the previous state, then put the previous state
+  -- into inputs
+  -- while Karpathy doesn't use the intermediate "state" variable
+  -- 
 
   local x                = nn.Identity()()
   local y                = nn.Identity()()
@@ -156,8 +160,7 @@ local function create_network()
   -- Nghia: gModule: computation graph from nngraph
   local module           = nn.gModule({x, y, prev_s},
                                       {err, nn.Identity()(next_s)})
-  graph.dot(module.fg, "LSTM","/home/thenghiapham/lstm_fw")
-  graph.dot(module.bg, "LSTM","/home/thenghiapham/lstm_bw")                             
+                       
   -- TODO: check this uniform thing
   module:getParameters():uniform(-params.init_weight, params.init_weight)
   return transfer_data(module)
